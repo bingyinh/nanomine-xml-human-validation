@@ -3,9 +3,10 @@ import glob
 import collections
 import uuid
 import csv
+import copy
 
-# generate the dict of infos contained in the xml
-def xml_human_valid_brief(xmlsDir):
+# initialization
+def init(xmlsDir):
     xmls = glob.glob(xmlsDir+'*.xml')
     if len(xmls) == 0:
         print 'No xml file found in the directory!'
@@ -23,87 +24,168 @@ def xml_human_valid_brief(xmlsDir):
     # sort IDs_xmls for user's ease, here we assume the ID's follow the naming
     # rule where sample ID S1, S2, etc. indicates the in-group order
     IDs_xmls.sort(key=lambda x: int(x[1]['sample ID'].split('_S')[1].split('_')[0]))
+    # copy the list and generate a list with a blank OrderedDict for other fields
+    others_xmls = []
+    for xmltup in IDs_xmls:
+        others_xmls.append((xmltup[0], collections.OrderedDict()))
     # output dict init
     output = collections.OrderedDict(IDs_xmls) # output dict init
+    # IDS dict init
+    IDS = collections.OrderedDict(copy.deepcopy(IDs_xmls))
+    # other blank dict init
+    DAT = collections.OrderedDict(copy.deepcopy(others_xmls))
+    MAT = collections.OrderedDict(copy.deepcopy(others_xmls))
+    PROC = collections.OrderedDict(copy.deepcopy(others_xmls))
+    CHAR = collections.OrderedDict(copy.deepcopy(others_xmls))
+    PROP = collections.OrderedDict(copy.deepcopy(others_xmls))
+    MIC = collections.OrderedDict(copy.deepcopy(others_xmls))
+    return xmls, output, IDS, DAT, MAT, PROC, CHAR, PROP, MIC
+
+# generate the dict of infos contained in the xml
+def xml_human_valid(xmlsDir, brief):
+    xmls, output, IDS, DAT, MAT, PROC, CHAR, PROP, MIC = init(xmlsDir)
     # second loop on xmls
     for xml in xmls:
         tree = ET.parse(xml)
-        # Control ID
-        output[xml] = extractDetXpath(tree.findall('.//Control_ID'),
-                                      output[xml], 'Control ID')
-        # matrix name
-        output[xml] = extractDetXpath(tree.findall('.//MatrixComponent/ChemicalName'),
-                                      output[xml], 'Matrix')
-        # filler name
-        output[xml] = extractDetXpath(tree.findall('.//FillerComponent/ChemicalName'),
-                                      output[xml], 'Filler')
-        # mass volume fraction
-        # find parent elements of all Fraction tag
-        Fra_pars = tree.findall('.//Fraction/..')
-        for Fra_par in Fra_pars:
-            prefix = '' # prefix as a header in the output file
-            # append the tag of Fra_par to the prefix, could be:
-            # MatrixComponentComposition, FillerComposition, and PST_Composition
-            prefix += Fra_par.tag
-            # based on the schema, only one Fraction is allowed
-            Fra = Fra_par.find('Fraction')
-            if len(Fra) != 1: # Fraction should only have one child
-                print '%s should only have one child element in node %s/Fraction' %(xml, prefix)
-                continue
-            mfvf = Fra[0] # could be mass element or volume element
-            prefix += '-' + mfvf.tag
-            output[xml][prefix] = mfvf.text
-        # PROPERTIES
-        root = tree.getroot()
-        for ele in root.iter():
-            xpath = tree.getelementpath(ele)
-            if 'PROPERTIES' not in xpath or '/data' in xpath :
-                continue
-            if ele.tag in ['value', 'unit', 'description', 'type']:
-                continue
-            children = extractChildren(ele)
-            if 'value' in children or 'unit' in children:
-                extractVUDXpath(ele, output[xml])
-            if ele.text is not None:
-                # determine the prefix
-                prefix = ele.tag
-                if prefix in output[xml]:
-                    suffix = 0
-                    while ' - '.join([prefix, str(suffix)]) in output[xml]:
-                        suffix += 1
-                    prefix = ' - '.join([prefix, str(suffix)])
-                output[xml][prefix] = ele.text.encode('utf8')
-
-    # get the common keys in the xmldicts
-    commonKey = []
-    for key in output.values()[0]: # use the first xml dict
-        uncommon = False
-        for xmldict in output.values():
-            if key not in xmldict:
-                uncommon = True
-        if not uncommon:
-            commonKey.append(key)
-    # get the complete key list while reserving the order
-    unmergedKey = [] # a 2d list
-    for xmldict in output.values():
-        unmergedKey.append(xmldict.keys())
-    mergedKey = mergeList(commonKey, unmergedKey)
-    # now fill in the uncommon keys for each xmldict
-    uncommonKey = [k for k in mergedKey if k not in commonKey]
-    for k in uncommonKey:
-        for xmldict in output.values():
-            if k not in xmldict:
-                xmldict[k] = ''
-    # for i in output:
-    #     print output[i]
+        if brief:
+            # Control ID
+            output[xml] = extractDetXpath(tree.findall('.//Control_ID'),
+                                          output[xml], 'Control ID')
+            IDS[xml] = extractDetXpath(tree.findall('.//Control_ID'),
+                                       IDS[xml], 'Control ID')
+            # matrix name
+            output[xml] = extractDetXpath(tree.findall('.//MatrixComponent/ChemicalName'),
+                                          output[xml], 'Matrix')
+            MAT[xml] = extractDetXpath(tree.findall('.//MatrixComponent/ChemicalName'),
+                                       MAT[xml], 'Matrix')
+            # filler name
+            output[xml] = extractDetXpath(tree.findall('.//FillerComponent/ChemicalName'),
+                                          output[xml], 'Filler')
+            MAT[xml] = extractDetXpath(tree.findall('.//FillerComponent/ChemicalName'),
+                                       MAT[xml], 'Filler')
+            # mass volume fraction
+            # find parent elements of all Fraction tag
+            Fra_pars = tree.findall('.//Fraction/..')
+            for Fra_par in Fra_pars:
+                prefix = '' # prefix as a header in the output file
+                # append the tag of Fra_par to the prefix, could be:
+                # MatrixComponentComposition, FillerComposition, and PST_Composition
+                prefix += Fra_par.tag
+                # based on the schema, only one Fraction is allowed
+                Fra = Fra_par.find('Fraction')
+                if len(Fra) != 1: # Fraction should only have one child
+                    print '%s should only have one child element in node %s/Fraction' %(xml, prefix)
+                    continue
+                mfvf = Fra[0] # could be mass element or volume element
+                prefix += '-' + mfvf.tag
+                output[xml][prefix] = mfvf.text
+                MAT[xml][prefix] = mfvf.text
+            # PROPERTIES
+            root = tree.getroot()
+            for ele in root.iter():
+                xpath = tree.getelementpath(ele)
+                if 'PROPERTIES' not in xpath or '/data' in xpath :
+                    continue
+                if ele.tag in ['value', 'unit', 'description', 'type']:
+                    continue
+                children = extractChildren(ele)
+                if 'value' in children or 'unit' in children:
+                    extractVUDXpath(ele, output[xml])
+                    extractVUDXpath(ele, PROP[xml])
+                if ele.text is not None:
+                    # determine the prefix
+                    prefix = ele.tag
+                    if prefix in output[xml]:
+                        suffix = 0
+                        while ' - '.join([prefix, str(suffix)]) in output[xml]:
+                            suffix += 1
+                        prefix = ' - '.join([prefix, str(suffix)])
+                    output[xml][prefix] = ele.text.encode('utf8')
+                    PROP[xml][prefix] = ele.text.encode('utf8')
+        else:
+            root = tree.getroot()
+            for ele in root.iter():
+                xpath = tree.getelementpath(ele)
+                if 'PROCESSING' in xpath or '/data' in xpath :
+                    continue
+                if ele.tag in ['value', 'unit', 'description', 'type']:
+                    continue
+                children = extractChildren(ele)
+                if 'value' in children or 'unit' in children:
+                    extractVUDXpath(ele, output[xml])
+                    if 'ID' in xpath:
+                        extractVUDXpath(ele, IDS[xml])
+                    elif 'DATA_SOURCE' in xpath:
+                        extractVUDXpath(ele, DAT[xml])
+                    elif 'MATERIALS' in xpath:
+                        extractVUDXpath(ele, MAT[xml])
+                    elif 'CHARACTERIZATION' in xpath:
+                        extractVUDXpath(ele, CHAR[xml])
+                    elif 'PROPERTIES' in xpath:
+                        extractVUDXpath(ele, PROP[xml])
+                    elif 'MICROSTRUCTURE' in xpath:
+                        extractVUDXpath(ele, MIC[xml])
+                if ele.text is not None:
+                    # determine the prefix
+                    prefix = ele.tag
+                    if prefix in output[xml]:
+                        suffix = 0
+                        while ' - '.join([prefix, str(suffix)]) in output[xml]:
+                            suffix += 1
+                        prefix = ' - '.join([prefix, str(suffix)])
+                    if 'ID' in xpath:
+                        IDS[xml][prefix] = ele.text.encode('utf8')
+                    elif 'DATA_SOURCE' in xpath:
+                        DAT[xml][prefix] = ele.text.encode('utf8')
+                    elif 'MATERIALS' in xpath:
+                        if ele.tag == 'mass' or ele.tag == 'volume':
+                            prefix = ele.getparent().getparent().tag + ' - ' + prefix
+                        MAT[xml][prefix] = ele.text.encode('utf8')
+                    elif 'CHARACTERIZATION' in xpath:
+                        CHAR[xml][prefix] = ele.text.encode('utf8')
+                    elif 'PROPERTIES' in xpath:
+                        PROP[xml][prefix] = ele.text.encode('utf8')
+                    elif 'MICROSTRUCTURE' in xpath:
+                        MIC[xml][prefix] = ele.text.encode('utf8')
+                    output[xml][prefix] = ele.text.encode('utf8')
+                    
+    # loop thru the top level dicts to get the mergedKey without losing the
+    # order among the top level items
+    mergedKeyTop = []
+    for top in [IDS, DAT, MAT, PROC, CHAR, PROP, MIC]:
+        # get the common keys in the xmldicts
+        commonKey = []
+        for key in top.values()[0]: # use the first xml dict
+            uncommon = False
+            for xmldict in top.values():
+                if key not in xmldict:
+                    uncommon = True
+            if not uncommon:
+                commonKey.append(key)
+        # get the complete key list while reserving the order
+        unmergedKey = [] # a 2d list
+        for xmldict in top.values():
+            unmergedKey.append(xmldict.keys())
+        mergedKey = mergeList(commonKey, unmergedKey)
+        mergedKeyTop += mergedKey
+        # now fill in the uncommon keys for each xmldict
+        uncommonKey = [k for k in mergedKey if k not in commonKey]
+        for k in uncommonKey:
+            for xmldict in output.values():
+                if k not in xmldict:
+                    xmldict[k] = ''
     # generate csv file
-    with open(xmlsDir+'brief_report.csv', 'wb') as f:
-        writer = csv.DictWriter(f, fieldnames = mergedKey)
+    if brief:
+        filename = xmlsDir+'brief_report.csv'
+    else:
+        filename = xmlsDir+'full_report.csv'
+    with open(filename, 'wb') as f:
+        writer = csv.DictWriter(f, fieldnames = mergedKeyTop)
         writer.writeheader()
         # writer.writerow({'xml directory':"Date: " + date.today().isoformat()})
         for xmldict in output.values():
             writer.writerow(xmldict)
-    print 'Brief report generated as %sbrief_report.csv' %(xmlsDir)
+    print 'Report generated as %s' %(filename)
     return
 
 # helper method for extracting determined xpath elements
@@ -193,86 +275,10 @@ def indexOfTwoDListHead(twoDList, indexRef):
             index.append(indexRef.index(head))
     return index
 
-# a full info extraction method that only skips the processing part
-def xml_human_valid_full(xmlsDir):
-    xmls = glob.glob(xmlsDir+'*.xml')
-    if len(xmls) == 0:
-        print 'No xml file found in the directory!'
-        return
-    IDs_xmls = []
-    # loop thru xmls twice, first time get the ID's, second time get other infos
-    for xml in xmls:
-        tree = ET.parse(xml)
-        IDele = tree.find('.//ID')
-        if IDele is None:
-            ID = str(uuid.uuid4()) + '_S0' # add '_S0' to avoid errors in sort()
-        else:
-            ID = IDele.text.strip()
-        IDs_xmls.append((xml,collections.OrderedDict({'sample ID':ID})))
-    # sort IDs_xmls for user's ease, here we assume the ID's follow the naming
-    # rule where sample ID S1, S2, etc. indicates the in-group order
-    IDs_xmls.sort(key=lambda x: int(x[1]['sample ID'].split('_S')[1].split('_')[0]))
-    # output dict init
-    output = collections.OrderedDict(IDs_xmls) # output dict init
-    # second loop on xmls
-    for xml in xmls:
-        tree = ET.parse(xml)
-        # only skip PROCESSING
-        root = tree.getroot()
-        for ele in root.iter():
-            xpath = tree.getelementpath(ele)
-            if 'PROCESSING' in xpath or '/data' in xpath :
-                continue
-            if ele.tag in ['value', 'unit', 'description', 'type']:
-                continue
-            children = extractChildren(ele)
-            if 'value' in children or 'unit' in children:
-                extractVUDXpath(ele, output[xml])
-            if ele.text is not None:
-                # determine the prefix
-                prefix = ele.tag
-                if prefix in output[xml]:
-                    suffix = 0
-                    while ' - '.join([prefix, str(suffix)]) in output[xml]:
-                        suffix += 1
-                    prefix = ' - '.join([prefix, str(suffix)])
-                output[xml][prefix] = ele.text.encode('utf8')
-    # get the common keys in the xmldicts
-    commonKey = []
-    for key in output.values()[0]: # use the first xml dict
-        uncommon = False
-        for xmldict in output.values():
-            if key not in xmldict:
-                uncommon = True
-        if not uncommon:
-            commonKey.append(key)
-    # get the complete key list while reserving the order
-    unmergedKey = [] # a 2d list
-    for xmldict in output.values():
-        unmergedKey.append(xmldict.keys())
-    mergedKey = mergeList(commonKey, unmergedKey)
-    # now fill in the uncommon keys for each xmldict
-    uncommonKey = [k for k in mergedKey if k not in commonKey]
-    for k in uncommonKey:
-        for xmldict in output.values():
-            if k not in xmldict:
-                xmldict[k] = ''
-    # for i in output:
-    #     print output[i]
-    # generate csv file
-    with open(xmlsDir+'full_report.csv', 'wb') as f:
-        writer = csv.DictWriter(f, fieldnames = mergedKey)
-        writer.writeheader()
-        # writer.writerow({'xml directory':"Date: " + date.today().isoformat()})
-        for xmldict in output.values():
-            writer.writerow(xmldict)
-    print 'Full report generated as %sfull_report.csv' %(xmlsDir)
-    return
-
 # a run function
 def run(xmlsDir):
-    xml_human_valid_brief(xmlsDir)
-    xml_human_valid_full(xmlsDir)
+    xml_human_valid(xmlsDir, True)
+    xml_human_valid(xmlsDir, False)
 
 if __name__ == '__main__':
     xmlsDir = raw_input('Please type in the directory of the xml folder:')
