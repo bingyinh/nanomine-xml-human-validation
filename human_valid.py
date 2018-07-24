@@ -50,19 +50,19 @@ def xml_human_valid(xmlsDir, brief):
         if brief:
             # Control ID
             output[xml] = extractDetXpath(tree.findall('.//Control_ID'),
-                                          output[xml], 'Control ID')
+                                          output[xml], 'Control ID', '')
             IDS[xml] = extractDetXpath(tree.findall('.//Control_ID'),
-                                       IDS[xml], 'Control ID')
+                                       IDS[xml], 'Control ID', tree)
             # matrix name
             output[xml] = extractDetXpath(tree.findall('.//MatrixComponent/ChemicalName'),
-                                          output[xml], 'Matrix')
+                                          output[xml], 'Matrix', '')
             MAT[xml] = extractDetXpath(tree.findall('.//MatrixComponent/ChemicalName'),
-                                       MAT[xml], 'Matrix')
+                                       MAT[xml], 'Matrix', tree)
             # filler name
             output[xml] = extractDetXpath(tree.findall('.//FillerComponent/ChemicalName'),
-                                          output[xml], 'Filler')
+                                          output[xml], 'Filler', '')
             MAT[xml] = extractDetXpath(tree.findall('.//FillerComponent/ChemicalName'),
-                                       MAT[xml], 'Filler')
+                                       MAT[xml], 'Filler', tree)
             # mass volume fraction
             # find parent elements of all Fraction tag
             Fra_pars = tree.findall('.//Fraction/..')
@@ -79,7 +79,7 @@ def xml_human_valid(xmlsDir, brief):
                 mfvf = Fra[0] # could be mass element or volume element
                 prefix += '-' + mfvf.tag
                 output[xml][prefix] = mfvf.text
-                MAT[xml][prefix] = mfvf.text
+                MAT[xml][prefix] = (mfvf.text, idXpath(tree.getelementpath(mfvf)))
             # PROPERTIES
             root = tree.getroot()
             for ele in root.iter():
@@ -90,18 +90,20 @@ def xml_human_valid(xmlsDir, brief):
                     continue
                 children = extractChildren(ele)
                 if 'value' in children or 'unit' in children:
-                    extractVUDXpath(ele, output[xml])
-                    extractVUDXpath(ele, PROP[xml])
+                    extractVUDXpath(ele, output[xml], '')
+                    extractVUDXpath(ele, PROP[xml], idXpath(xpath))
                 if ele.text is not None:
                     # determine the prefix
                     prefix = ele.tag
+                    suffix = ''
                     if prefix in output[xml]:
-                        suffix = 0
-                        while ' - '.join([prefix, str(suffix)]) in output[xml]:
-                            suffix += 1
-                        prefix = ' - '.join([prefix, str(suffix)])
+                        ct = 0
+                        while ' - '.join([prefix, str(ct)]) in output[xml]:
+                            ct += 1
+                        suffix = ' - ' + str(ct)
+                        prefix += suffix
                     output[xml][prefix] = ele.text.encode('utf8')
-                    PROP[xml][prefix] = ele.text.encode('utf8')
+                    PROP[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
         else:
             root = tree.getroot()
             for ele in root.iter():
@@ -112,41 +114,43 @@ def xml_human_valid(xmlsDir, brief):
                     continue
                 children = extractChildren(ele)
                 if 'value' in children or 'unit' in children:
-                    extractVUDXpath(ele, output[xml])
+                    extractVUDXpath(ele, output[xml], '')
                     if 'ID' in xpath:
-                        extractVUDXpath(ele, IDS[xml])
+                        extractVUDXpath(ele, IDS[xml], idXpath(xpath))
                     elif 'DATA_SOURCE' in xpath:
-                        extractVUDXpath(ele, DAT[xml])
+                        extractVUDXpath(ele, DAT[xml], idXpath(xpath))
                     elif 'MATERIALS' in xpath:
-                        extractVUDXpath(ele, MAT[xml])
+                        extractVUDXpath(ele, MAT[xml], idXpath(xpath))
                     elif 'CHARACTERIZATION' in xpath:
-                        extractVUDXpath(ele, CHAR[xml])
+                        extractVUDXpath(ele, CHAR[xml], idXpath(xpath))
                     elif 'PROPERTIES' in xpath:
-                        extractVUDXpath(ele, PROP[xml])
+                        extractVUDXpath(ele, PROP[xml], idXpath(xpath))
                     elif 'MICROSTRUCTURE' in xpath:
-                        extractVUDXpath(ele, MIC[xml])
+                        extractVUDXpath(ele, MIC[xml], idXpath(xpath))
                 if ele.text is not None:
                     # determine the prefix
                     prefix = ele.tag
+                    suffix = ''
                     if prefix in output[xml]:
-                        suffix = 0
-                        while ' - '.join([prefix, str(suffix)]) in output[xml]:
-                            suffix += 1
-                        prefix = ' - '.join([prefix, str(suffix)])
+                        ct = 0
+                        while ' - '.join([prefix, str(ct)]) in output[xml]:
+                            ct += 1
+                        suffix = ' - ' + str(ct)
+                        prefix += suffix
                     if 'ID' in xpath:
-                        IDS[xml][prefix] = ele.text.encode('utf8')
+                        IDS[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
                     elif 'DATA_SOURCE' in xpath:
-                        DAT[xml][prefix] = ele.text.encode('utf8')
+                        DAT[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
                     elif 'MATERIALS' in xpath:
                         if ele.tag == 'mass' or ele.tag == 'volume':
                             prefix = ele.getparent().getparent().tag + ' - ' + prefix
-                        MAT[xml][prefix] = ele.text.encode('utf8')
+                        MAT[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
                     elif 'CHARACTERIZATION' in xpath:
-                        CHAR[xml][prefix] = ele.text.encode('utf8')
+                        CHAR[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
                     elif 'PROPERTIES' in xpath:
-                        PROP[xml][prefix] = ele.text.encode('utf8')
+                        PROP[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
                     elif 'MICROSTRUCTURE' in xpath:
-                        MIC[xml][prefix] = ele.text.encode('utf8')
+                        MIC[xml][prefix] = (ele.text.encode('utf8'), idXpath(xpath) + suffix)
                     output[xml][prefix] = ele.text.encode('utf8')
                     
     # loop thru the top level dicts to get the mergedKey without losing the
@@ -166,7 +170,7 @@ def xml_human_valid(xmlsDir, brief):
         unmergedKey = [] # a 2d list
         for xmldict in top.values():
             unmergedKey.append(xmldict.keys())
-        mergedKey = mergeList(commonKey, unmergedKey)
+        mergedKey = mergeList(commonKey, unmergedKey, top)
         mergedKeyTop += mergedKey
         # now fill in the uncommon keys for each xmldict
         uncommonKey = [k for k in mergedKey if k not in commonKey]
@@ -179,6 +183,7 @@ def xml_human_valid(xmlsDir, brief):
         filename = xmlsDir+'brief_report.csv'
     else:
         filename = xmlsDir+'full_report.csv'
+    # remove the 
     with open(filename, 'wb') as f:
         writer = csv.DictWriter(f, fieldnames = mergedKeyTop)
         writer.writeheader()
@@ -189,28 +194,42 @@ def xml_human_valid(xmlsDir, brief):
     return
 
 # helper method for extracting determined xpath elements
-def extractDetXpath(eles, output_xml, prefix):
-    # single element
-    if len(eles) == 1:
-        output_xml[prefix] = eles[0].text
-    return output_xml
-    # multiple elements
-    ct = 0 # in case of multiple Matrix
-    for ele in eles:
-        header = prefix + '-' + str(ct) # a header in the output file
-        output_xml[header] = ele.text
-        ct += 1
+def extractDetXpath(eles, output_xml, prefix, tree):
+    if tree == '':
+        # single element
+        if len(eles) == 1:
+            output_xml[prefix] = eles[0].text
+        return output_xml
+        # multiple elements
+        ct = 0 # in case of multiple Matrix
+        for ele in eles:
+            header = prefix + ' - ' + str(ct) # a header in the output file
+            output_xml[header] = ele.text
+            ct += 1
+    else:    
+        # single element
+        if len(eles) == 1:
+            output_xml[prefix] = (eles[0].text, idXpath(tree.getelementpath(eles[0])))
+        return output_xml
+        # multiple elements
+        ct = 0 # in case of multiple Matrix
+        for ele in eles:
+            header = prefix + ' - ' + str(ct) # a header in the output file
+            output_xml[header] = (ele.text, idXpath(tree.getelementpath(ele)) + ' - ' + str(ct))
+            ct += 1
     return output_xml
 
 # helper method for extracting xpath elements with value, unit, and description
-def extractVUDXpath(ele, output_xml):
+def extractVUDXpath(ele, output_xml, xpathID):
     # determine the prefix
     prefix = ele.tag
+    suffix = ''
     if prefix in output_xml:
-        suffix = 0
-        while ' - '.join([prefix, str(suffix)]) in output_xml:
-            suffix += 1
-        prefix = ' - '.join([prefix, str(suffix)])
+        ct = 0
+        while ' - '.join([prefix, str(ct)]) in output_xml:
+            ct += 1
+        suffix = ' - ' + str(ct)
+        prefix += suffix
     # value and unit, type for uncertainty
     value = ''
     unit = ''
@@ -222,13 +241,19 @@ def extractVUDXpath(ele, output_xml):
     if ele.find('type') is not None:
         unctype = ele.find('type').text
     if len(value) > 0 or len(unit) > 0:
-        output_xml[prefix] = ' '.join([unctype, value, unit])
+        if xpathID == '':
+            output_xml[prefix] = ' '.join([unctype, value, unit])    
+        else:
+            output_xml[prefix] = (' '.join([unctype, value, unit]), xpathID + suffix)
     # description
     desc = ''
     if ele.find('description') is not None:
         desc = ele.find('description').text
     if len(desc) > 0:
-        output_xml[prefix + ' - description'] = desc
+        if xpathID == '':
+            output_xml[prefix + ' - description'] = desc
+        else:
+            output_xml[prefix + ' - description'] = (desc, xpathID + suffix)
     return output_xml
 
 # helper method for getting tags of all the child elements
@@ -240,14 +265,18 @@ def extractChildren(ele):
 
 # helper method for merge lists while preserving the order.
 # Example: [[1, 3, 7], [1, 2, 3, 7, 8]] => [1, 2, 3, 7, 8]
-def mergeList(commonKey, unmergedKey):
+def mergeList(commonKey, unmergedKey, topLevelDict):
     mergedKey = [] # init
     # as long as unmergedKey has content, loop
     while len(sum(unmergedKey, [])) > 0: # flatten unmergedKey into 1d list
         # get the index in the commonKey of the first items in the nested lists
-        indexList = indexOfTwoDListHead(unmergedKey, commonKey)
-        # always add uncommon keys to the mergedKey before common keys
-        indexForPop = min(indexList) # find the min
+        # by default, if there is an uncommon key, the indexList will contain
+        # the xpathID instead
+        indexList = indexOfTwoDListHead(unmergedKey, commonKey, topLevelDict)
+        indexForPop = minXpath(indexList) # find the min
+        # print '========================='
+        # print indexList
+        # print indexForPop
         # get the indices of the nested list to poped
         indices = [i for i, x in enumerate(indexList) if x == indexForPop]
         for i in indices:
@@ -256,11 +285,67 @@ def mergeList(commonKey, unmergedKey):
                 mergedKey.append(popedKey)
     return mergedKey
 
-# helper method to get the index of the first item in each nested 1d list in a
-# given 2d list according to the given indexRef
-def indexOfTwoDListHead(twoDList, indexRef):
+# a helper method to find the "min" xpathID
+def minXpath(xpathIDList):
+    default = True
+    xpathIDSet = set(xpathIDList)
+    for xpathID in xpathIDSet:
+        if ' - ' in xpathID:
+            default = False
+    if default:
+        return min(xpathIDSet)
+    sortedXpathList = sorted(list(xpathIDSet))
+    # find the first dashed item and the first non dashed item
+    firstDash = ''
+    firstNonDash = ''
+    dashed = []
+    for xpathID in sortedXpathList:
+        # unlike non dashed items, dashed items are not yet sorted
+        if ' - ' in xpathID:
+            dashed.append(xpathID)
+        if ' - ' not in xpathID and firstNonDash == '':
+            firstNonDash = xpathID
+    dashed.sort(key=lambda x: x.split(' - ')[0])
+    dashed.sort(key=lambda x: x.split(' - ')[-1])
+    if len(dashed) > 0:
+        firstDash = dashed[0]
+    # compare firstDash and firstNonDash
+    # when we have both dashed item and non dashed item, we need to use our
+    # own way to find the min
+    if firstDash != '' and firstNonDash != '':
+        # check the chars from the beginning to the ' - ' (last char excluded)
+        # i.e. check whether the two ele's have the same parent
+        # examples:
+        # 6102 - 0 > 6104   same 610
+        # 6102 - 0 > 61023  same 610
+        # 6102 - 0 < 611    610 < 611
+        # 6102 - 0 < 6125   610 < 612
+        firstDashPar = firstDash[:firstDash.find(' - ') - 1] # get the parent
+        if len(firstDashPar) <= len(firstNonDash):
+            if firstNonDash[:len(firstDashPar)] <= firstDashPar:
+                return firstNonDash
+            else:
+                return firstDash
+        else:
+            if firstDashPar <= firstNonDash:
+                return firstDash
+            else: # not likely
+                return firstNonDash
+    elif firstDash != '' and firstNonDash == '':
+        # first compare by the number before the dash, then compare by the 
+        # number after the dash
+        sortedXpathList.sort(key=lambda x: x.split(' - ')[0])
+        sortedXpathList.sort(key=lambda x: x.split(' - ')[-1])
+        return sortedXpathList[0]
+
+
+# a helper method to get the index of the first item in each nested 1d list in a
+# given 2d list according to the given indexRef by default, if there is an item
+# that is not in the indexRef, the xpathID will be returned instead
+def indexOfTwoDListHead(twoDList, indexRef, topLevelDict):
     heads = []
     index = []
+    xpathFlag = False # a flag for return xpath
     for i in twoDList:
         if len(i) == 0:
             heads.append('')
@@ -268,12 +353,56 @@ def indexOfTwoDListHead(twoDList, indexRef):
             heads.append(i[0])
     for head in heads:
         if head == '':
-            index.append(len(indexRef)) # a very large number
+            index.append(str(len(indexRef))) # a very large number
         elif head not in indexRef:
-            index.append(-1)
+            xpathFlag = True # raise the flag
+            index = [] # init index
+            break
         else:
-            index.append(indexRef.index(head))
+            index.append(str(indexRef.index(head)))
+    if xpathFlag:
+        for j in xrange(len(heads)):
+            head = heads[j]
+            if head == '':
+                xpathID = 'EMPTY'
+            else:
+                xml = topLevelDict.keys()[j]
+                xpathID = topLevelDict[xml][head][1]
+                if head not in indexRef:
+                    xpathID = '00' + xpathID # pop the uncommon keys first
+            index.append(xpathID)
     return index
+
+# a helper method to id xpath based on their order of appearance in the schema
+# xpath example: 'PROPERTIES/Electrical/AC_DielectricDispersion[2]/Dielectric_Real_Permittivity/data'
+def idXpath(xpath):
+    myID = '' # init the id for the xpath
+    tree = ET.parse('E:/Duke/DIBBS/data_update/info_update_xml/schema/PNC_schema_060718.xsd') # load the schema
+    tempTree = tree.find('.//*[@name="Root"]') # this variable will go one level deeper after each iter
+    names = xpath.split('/') # split the xpath
+    for name in names:
+        if '[' in name and name[-1] == ']':
+            name = name[0:name.index('[')]
+        (ele, index) = getChildNIndex(tempTree, name)
+        myID += str(index) # append to myID
+        # find the type of ele
+        eleType = ele.get('type')
+        # find the element with the name of the type we get earlier
+        typePath = './/*[@name="%s"]' %(eleType)
+        if name == 'Citation':
+            tempTree = tree.findall(typePath)[1]
+        else:
+            tempTree = tree.find(typePath)
+    return myID
+    
+# get the child element matching the given name and its index
+def getChildNIndex(tempTree, name):
+    index = 0
+    for ele in tempTree[0].iter('{http://www.w3.org/2001/XMLSchema}element'):
+        if ele.get('name') == name:
+            return (ele, index)
+        index += 1
+    return (None, -1)
 
 # a run function
 def run(xmlsDir):
@@ -286,12 +415,22 @@ if __name__ == '__main__':
     if len(xmlsDir) > 0 and xmlsDir[-1] != '/':
         xmlsDir += '/'
     run(xmlsDir)
+    # run('./274/')
     
     # test
     # unmergedKey = [[1,2,3], [2,3,4], [7, 2,3], [7,8,2,9,3]]
     # commonKey = [2, 3]
     # assert(mergeList(commonKey, unmergedKey) == [1,7,8,2,9,3,4])
     # print 'Pass!'
-
-
-
+    # xpath = 'PROPERTIES/Electrical/AC_DielectricDispersion[2]/Dielectric_Real_Permittivity/data'
+    # xpath = 'DATA_SOURCE/Citation/CommonFields/DOI'
+    # print idXpath(xpath)
+    # xpathIDList = ['6102 - 2', '6101 - 1', '7120 - 0', '6102 - 0', '6102 - 1']
+    # assert(minXpath(xpathIDList) == '6102 - 0')
+    # xpathIDList = ['6102 - 2', '6101 - 1', '7120 - 0', '6102 - 0', '6109']
+    # assert(minXpath(xpathIDList) == '6109')
+    # xpathIDList = ['6102 - 2', '6101 - 1', '7120 - 0', '6102 - 0', '6109', '91']
+    # assert(minXpath(xpathIDList) == '6109')
+    # xpathIDList = ['6102 - 2', '6101 - 1', '7120 - 0', '6102 - 0', '62']
+    # assert(minXpath(xpathIDList) == '6102 - 0')
+    # print "Tests passed for minXpath()!"

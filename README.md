@@ -12,3 +12,7 @@ Package requirement:
     csv                   (Python standard library)
 
 A brief report and a full report will be generated as csv files. For spectra data, please refer to https://github.com/bingyinh/nanomine-xml-viz-validation.
+
+# Update 072418
+
+The logic of sorting the columns in the output files are updated to follow the human convention while reading xml files.
