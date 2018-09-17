@@ -127,7 +127,7 @@ def xml_human_valid(xmlsDir, brief):
                         extractVUDXpath(ele, PROP[xml], idXpath(xpath))
                     elif 'MICROSTRUCTURE' in xpath:
                         extractVUDXpath(ele, MIC[xml], idXpath(xpath))
-                if ele.text is not None:
+                if ele.text is not None and ele.text.strip() != '':
                     # determine the prefix
                     prefix = ele.tag
                     suffix = ''
