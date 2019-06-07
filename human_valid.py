@@ -189,7 +189,8 @@ def xml_human_valid(xmlsDir, brief):
         writer.writeheader()
         # writer.writerow({'xml directory':"Date: " + date.today().isoformat()})
         for xmldict in output.values():
-            writer.writerow(xmldict)
+            writer.writerow({k:unicode(v).encode('utf8').strip() for k,v in xmldict.items()})
+            # writer.writerow(xmldict)
     print 'Report generated as %s' %(filename)
     return
 
@@ -377,7 +378,7 @@ def indexOfTwoDListHead(twoDList, indexRef, topLevelDict):
 # xpath example: 'PROPERTIES/Electrical/AC_DielectricDispersion[2]/Dielectric_Real_Permittivity/data'
 def idXpath(xpath):
     myID = '' # init the id for the xpath
-    tree = ET.parse('E:/Duke/DIBBS/data_update/info_update_xml/schema/PNC_schema_060718.xsd') # load the schema
+    tree = ET.parse('D:/Dropbox/DIBBS/nanomine-schema/xml/PNC_schema_081218.xsd') # load the schema
     tempTree = tree.find('.//*[@name="Root"]') # this variable will go one level deeper after each iter
     names = xpath.split('/') # split the xpath
     for name in names:
